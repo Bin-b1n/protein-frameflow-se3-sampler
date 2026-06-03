@@ -48,15 +48,6 @@
 
 ## 环境配置
 
-本实验在 AutoDL 环境下跑通，配置如下：
-
-```text
-Python: 3.12
-CUDA: 12.4
-PyTorch: 2.5.1
-GPU: single CUDA GPU
-```
-
 原作者 `fm.yml` 推荐环境为 Python 3.10 + PyTorch 2.0.1 + CUDA 11.7。本项目当前使用的是较新的 Python 3.12 / CUDA 12.4 / PyTorch 2.5.1 环境，因此需要使用适配版依赖文件：
 
 ```bash
@@ -78,17 +69,6 @@ pip install -r requirements-inference.txt
 - `tmtools`
 - `einops`
 
-安装后建议先检查 PyTorch 与 CUDA：
-
-```bash
-python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available())"
-```
-
-期望输出类似：
-
-```text
-2.5.1 12.4 True
-```
 
 ## 权重准备
 
@@ -119,7 +99,7 @@ inference:
 进入项目目录：
 
 ```bash
-cd ~/autodl-tmp/protein-frame-flow-main
+cd ~/protein-frame-flow-main
 ```
 
 ### 5 步 Euler
@@ -146,17 +126,6 @@ python -W ignore experiments/inference_se3_flows.py \
   inference.inference_subdir=euler_20
 ```
 
-### 100 步 Euler
-
-```bash
-python -W ignore experiments/inference_se3_flows.py \
-  -cn inference_unconditional \
-  inference.num_gpus=1 \
-  'inference.interpolant.sampling.num_timesteps=100' \
-  'inference.samples.length_subset=[50,60,70,80,90,100]' \
-  inference.samples.samples_per_length=2 \
-  inference.inference_subdir=euler_100
-```
 
 采样步数由下面这个 Hydra 参数控制：
 
@@ -235,13 +204,6 @@ python analysis/evaluate_samples.py \
   --out inference_outputs/weights/pdb/published/unconditional/euler_20/metrics.csv
 ```
 
-### 评估 100 步结果
-
-```bash
-python analysis/evaluate_samples.py \
-  --root inference_outputs/weights/pdb/published/unconditional/euler_100 \
-  --out inference_outputs/weights/pdb/published/unconditional/euler_100/metrics.csv
-```
 
 主要指标包括：
 
@@ -286,10 +248,9 @@ Finished in 6.78s
 scripts/run_quality_efficiency_benchmark.sh
 ```
 
-推荐在 AutoDL 上运行：
 
 ```bash
-cd ~/autodl-tmp/protein-frame-flow-main
+cd ~/protein-frame-flow-main
 
 SAMPLES_PER_LENGTH=20 \
 TIMESTEPS="5 10 20 50 100" \
@@ -433,12 +394,6 @@ python analysis/evaluate_samples.py \
   --out inference_outputs/weights/pdb/published/unconditional/heun_5_limited/metrics.csv
 ```
 
-然后与 Euler 5 步结果对比：
-
-```text
-inference_outputs/weights/pdb/published/unconditional/euler_5/metrics.csv
-inference_outputs/weights/pdb/published/unconditional/heun_5_limited/metrics.csv
-```
 
 注意：当前代码中的 `num_timesteps=5` 表示 5 个时间网格点，即 4 个积分区间和 1 次最终预测。Euler 约为 5 次网络调用，Heun 约为 `2 * 4 + 1 = 9` 次网络调用。
 

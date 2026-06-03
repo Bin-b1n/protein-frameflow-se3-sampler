@@ -316,19 +316,19 @@ coil_percent_vs_runtime.png
 
 ### CA-CA 几何质量
 
-<img src="./figures/ca_ca_deviation_vs_runtime.png" alt="CA-CA deviation vs runtime" width="680">
+<img src="./figures/ca_ca_deviation_vs_runtime.png" alt="CA-CA deviation vs runtime" width="560">
 
-<img src="./figures/ca_ca_bad_percent_vs_runtime.png" alt="CA-CA bad percent vs runtime" width="680">
+<img src="./figures/ca_ca_bad_percent_vs_runtime.png" alt="CA-CA bad percent vs runtime" width="560">
 
-<img src="./figures/ca_ca_valid_percent_vs_runtime.png" alt="CA-CA valid percent vs runtime" width="680">
+<img src="./figures/ca_ca_valid_percent_vs_runtime.png" alt="CA-CA valid percent vs runtime" width="560">
 
 ### 全局形状与二级结构
 
-<img src="./figures/radius_of_gyration_vs_runtime.png" alt="Radius of gyration vs runtime" width="680">
+<img src="./figures/radius_of_gyration_vs_runtime.png" alt="Radius of gyration vs runtime" width="560">
 
-<img src="./figures/helix_percent_vs_runtime.png" alt="Helix percent vs runtime" width="680">
+<img src="./figures/helix_percent_vs_runtime.png" alt="Helix percent vs runtime" width="560">
 
-<img src="./figures/coil_percent_vs_runtime.png" alt="Coil percent vs runtime" width="680">
+<img src="./figures/coil_percent_vs_runtime.png" alt="Coil percent vs runtime" width="560">
 
 如果已经生成 metrics.csv，但缺少 runtime_seconds.txt，可以先按步数或网络调用次数画图：
 

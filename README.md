@@ -316,21 +316,21 @@ coil_percent_vs_runtime.png
 
 ### CA-CA 几何质量
 
-![CA-CA deviation vs runtime](figures/ca_ca_deviation_vs_runtime.png)
+<img src="./figures/ca_ca_deviation_vs_runtime.png" alt="CA-CA deviation vs runtime" width="680">
 
-![CA-CA bad percent vs runtime](figures/ca_ca_bad_percent_vs_runtime.png)
+<img src="./figures/ca_ca_bad_percent_vs_runtime.png" alt="CA-CA bad percent vs runtime" width="680">
 
-![CA-CA valid percent vs runtime](figures/ca_ca_valid_percent_vs_runtime.png)
+<img src="./figures/ca_ca_valid_percent_vs_runtime.png" alt="CA-CA valid percent vs runtime" width="680">
 
 ### 全局形状与二级结构
 
-![Radius of gyration vs runtime](figures/radius_of_gyration_vs_runtime.png)
+<img src="./figures/radius_of_gyration_vs_runtime.png" alt="Radius of gyration vs runtime" width="680">
 
-![Helix percent vs runtime](figures/helix_percent_vs_runtime.png)
+<img src="./figures/helix_percent_vs_runtime.png" alt="Helix percent vs runtime" width="680">
 
-![Coil percent vs runtime](figures/coil_percent_vs_runtime.png)
+<img src="./figures/coil_percent_vs_runtime.png" alt="Coil percent vs runtime" width="680">
 
-如果已经有 `metrics.csv`，但没有 `runtime_seconds.txt`，可以先按步数或网络调用次数画图：
+如果已经生成 metrics.csv，但缺少 runtime_seconds.txt，可以先按步数或网络调用次数画图：
 
 ```bash
 python analysis/plot_quality_efficiency.py \

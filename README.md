@@ -310,6 +310,26 @@ helix_percent_vs_runtime.png
 coil_percent_vs_runtime.png
 ```
 
+## 生成的对比图片
+
+以下图片来自 `quality_efficiency_n20` benchmark，用于展示 Euler / Heun / AB2 在不同采样步数下的质量-效率权衡。横轴为 wall-clock runtime，图中标注数字为采样步数。
+
+### CA-CA 几何质量
+
+![CA-CA deviation vs runtime](figures/ca_ca_deviation_vs_runtime.png)
+
+![CA-CA bad percent vs runtime](figures/ca_ca_bad_percent_vs_runtime.png)
+
+![CA-CA valid percent vs runtime](figures/ca_ca_valid_percent_vs_runtime.png)
+
+### 全局形状与二级结构
+
+![Radius of gyration vs runtime](figures/radius_of_gyration_vs_runtime.png)
+
+![Helix percent vs runtime](figures/helix_percent_vs_runtime.png)
+
+![Coil percent vs runtime](figures/coil_percent_vs_runtime.png)
+
 如果已经有 `metrics.csv`，但没有 `runtime_seconds.txt`，可以先按步数或网络调用次数画图：
 
 ```bash

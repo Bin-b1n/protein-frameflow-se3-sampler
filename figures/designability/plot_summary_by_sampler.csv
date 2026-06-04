@@ -1,0 +1,3 @@
+sampler,count,designable_count,mpnn_score_mean,standard_plddt_mean,standard_ptm_mean,ca_rmsd_mean,tm_norm_backbone_mean,designable_rate,sampler_label,runtime_seconds,network_calls,designable_per_second,designable_rate_per_second,designable_per_network_call,designable_rate_per_network_call
+euler_5_n20,30,0,1.44032,55.84002666666667,0.21984433333333334,16.487449633333334,0.2928363666666666,0.0,"Euler 5, n=20",37.0,5,0.0,0.0,0.0,0.0
+heun_5_n20,30,12,1.04879,71.01544,0.5845406333333333,2.9903516666666667,0.8017196333333333,0.4,"Heun 5, n=20",44.0,9,0.2727272727272727,0.009090909090909092,1.3333333333333333,0.044444444444444446

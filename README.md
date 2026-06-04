@@ -489,6 +489,252 @@ protein-frame-flow-main/inference_outputs/weights/pdb/published/unconditional/qu
 - `10` 步及以上：Euler 已经恢复到较稳定的几何范围，是更强的 practical baseline。
 - AB2 的 `10` 步结果接近 Euler，但 `5` 步明显失败，说明简单历史外推在极低步数下还不足以替代二次前向校正。
 
+## ProteinMPNN 序列设计与 ESMFold2 可设计性验证
+
+在完成 FrameFlow 骨架采样和几何质量评估后，本项目进一步接入 ProteinMPNN 与 ESMFold2，形成从“生成骨架”到“序列设计”再到“结构回折验证”的后处理闭环。该部分主要用于比较短采样步数下 `euler_5_n20` 与 `heun_5_n20` 生成骨架的可设计性。
+
+完整流程如下：
+
+```text
+FrameFlow sample.pdb
+  -> ProteinMPNN 设计序列
+  -> 每个骨架提取 top ProteinMPNN sequences
+  -> ESMFold2-Fast 批量初筛
+  -> 每个 sampler / length 选 top candidates
+  -> 标准 ESMFold2 复核
+  -> folded structure vs generated backbone
+  -> pLDDT / pTM / CA-RMSD / TM-score / designable rate
+```
+
+### 1. ProteinMPNN 序列设计
+
+ProteinMPNN 不随本仓库一起发布，需要在运行环境中单独准备。例如在 AutoDL 上：
+
+```bash
+git clone https://github.com/dauparas/ProteinMPNN.git /root/autodl-tmp/protein-frame-flow-main/ProteinMPNN
+```
+
+对 5-step Euler 骨架进行序列设计：
+
+```bash
+python scripts/run_proteinmpnn_on_samples.py \
+  --root inference_outputs/weights/pdb/published/unconditional/euler_5_n20 \
+  --proteinmpnn-dir /root/autodl-tmp/protein-frame-flow-main/ProteinMPNN \
+  --out inference_outputs/weights/pdb/published/unconditional/euler_5_n20/proteinmpnn \
+  --num-seq-per-target 8 \
+  --sampling-temp "0.1 0.2" \
+  --batch-size 1
+```
+
+对 5-step Heun 骨架执行同样流程：
+
+```bash
+python scripts/run_proteinmpnn_on_samples.py \
+  --root inference_outputs/weights/pdb/published/unconditional/heun_5_n20 \
+  --proteinmpnn-dir /root/autodl-tmp/protein-frame-flow-main/ProteinMPNN \
+  --out inference_outputs/weights/pdb/published/unconditional/heun_5_n20/proteinmpnn \
+  --num-seq-per-target 8 \
+  --sampling-temp "0.1 0.2" \
+  --batch-size 1
+```
+
+每个目录会生成 `proteinmpnn_manifest.csv`，并在每个样本目录下写出：
+
+```text
+proteinmpnn/length_*/sample_*/seqs/sample.fa
+```
+
+### 2. 提取 top ProteinMPNN 序列
+
+将 Euler 与 Heun 的 ProteinMPNN 结果合并，并为每个骨架保留 ProteinMPNN score 最低的 top 3 序列：
+
+```bash
+python scripts/collect_top_mpnn_sequences.py \
+  --manifest inference_outputs/weights/pdb/published/unconditional/euler_5_n20/proteinmpnn/proteinmpnn_manifest.csv \
+  --manifest inference_outputs/weights/pdb/published/unconditional/heun_5_n20/proteinmpnn/proteinmpnn_manifest.csv \
+  --top-k 3 \
+  --out-fasta inference_outputs/weights/pdb/published/unconditional/designability_top3.fasta \
+  --out-csv inference_outputs/weights/pdb/published/unconditional/designability_top3.csv
+```
+
+本实验中共有：
+
+```text
+2 samplers * 6 lengths * 20 backbones * 3 sequences = 720 sequences
+```
+
+### 3. ESMFold2-Fast 批量初筛
+
+ESMFold2 需要单独安装 Biohub ESMFold2 环境和 Hugging Face 权重。Fast 版本适合先对全部 720 条序列进行高通量初筛。
+
+```bash
+python scripts/run_esmfold2_batch.py \
+  --fasta inference_outputs/weights/pdb/published/unconditional/designability_top3.fasta \
+  --out-dir inference_outputs/weights/pdb/published/unconditional/esmfold2_fast_top3 \
+  --model-name /root/autodl-tmp/hf_models/biohub_ESMFold2_Fast \
+  --device cuda \
+  --num-loops 3 \
+  --num-sampling-steps 32 \
+  --num-diffusion-samples 1 \
+  --seed 0
+```
+
+输出包括：
+
+```text
+esmfold2_fast_top3/*.cif
+esmfold2_fast_top3/esmfold2_results.csv
+```
+
+### 4. 选择标准 ESMFold2 复核候选
+
+根据 ESMFold2-Fast 的 `pLDDT`、`pTM` 以及 ProteinMPNN score，在每个 `sampler / length` 分组中选择 top candidates。为了扩大标准版复核样本，本项目使用 top 20：
+
+```bash
+python scripts/select_esmfold2_candidates.py \
+  --design-csv inference_outputs/weights/pdb/published/unconditional/designability_top3.csv \
+  --fast-csv inference_outputs/weights/pdb/published/unconditional/esmfold2_fast_top3/esmfold2_results.csv \
+  --top-per-group 20 \
+  --out-fasta inference_outputs/weights/pdb/published/unconditional/standard_review_top20.fasta \
+  --out-csv inference_outputs/weights/pdb/published/unconditional/standard_review_top20.csv
+```
+
+对应标准版复核规模为：
+
+```text
+2 samplers * 6 lengths * 20 candidates = 240 standard ESMFold2 reviews
+```
+
+### 5. 标准 ESMFold2 结构复核
+
+使用标准版 ESMFold2 对筛选后的 top 20 candidates 进行结构预测：
+
+```bash
+python scripts/run_esmfold2_batch.py \
+  --fasta inference_outputs/weights/pdb/published/unconditional/standard_review_top20.fasta \
+  --out-dir inference_outputs/weights/pdb/published/unconditional/esmfold2_standard_top20 \
+  --model-name /root/autodl-tmp/hf_models/biohub_ESMFold2 \
+  --device cuda \
+  --num-loops 3 \
+  --num-sampling-steps 32 \
+  --num-diffusion-samples 1 \
+  --seed 0
+```
+
+输出结构文件为 `.cif`，并生成：
+
+```text
+esmfold2_standard_top20/esmfold2_results.csv
+```
+
+### 6. 可设计性指标计算
+
+标准版 ESMFold2 复核后，将预测结构与 FrameFlow 生成骨架进行 CA 坐标对齐，计算 folded-vs-backbone 的 CA-RMSD，同时统计 pLDDT、pTM、TM-score 和 ProteinMPNN score。
+
+严格判定标准：
+
+```text
+pLDDT >= 70
+pTM >= 0.5
+CA-RMSD <= 2.0 Angstrom
+```
+
+```bash
+python scripts/analyze_designability.py \
+  --selection-csv inference_outputs/weights/pdb/published/unconditional/standard_review_top20.csv \
+  --fold-csv inference_outputs/weights/pdb/published/unconditional/esmfold2_standard_top20/esmfold2_results.csv \
+  --out-designs inference_outputs/weights/pdb/published/unconditional/designability_standard_top20_designs.csv \
+  --out-summary inference_outputs/weights/pdb/published/unconditional/designability_standard_top20_summary.csv \
+  --min-plddt 70 \
+  --min-ptm 0.5 \
+  --max-ca-rmsd 2.0
+```
+
+为了观察较宽松条件下 Euler 是否仍保留少量可设计样本，也提供 relaxed criteria：
+
+```text
+pLDDT >= 55
+pTM >= 0.15
+CA-RMSD <= 10.0 Angstrom
+```
+
+```bash
+python scripts/analyze_designability.py \
+  --selection-csv inference_outputs/weights/pdb/published/unconditional/standard_review_top20.csv \
+  --fold-csv inference_outputs/weights/pdb/published/unconditional/esmfold2_standard_top20/esmfold2_results.csv \
+  --out-designs inference_outputs/weights/pdb/published/unconditional/designability_relaxed_top20_designs.csv \
+  --out-summary inference_outputs/weights/pdb/published/unconditional/designability_relaxed_top20_summary.csv \
+  --min-plddt 55 \
+  --min-ptm 0.15 \
+  --max-ca-rmsd 10.0
+```
+
+### 7. 绘图展示
+
+严格标准图：
+
+```bash
+python scripts/plot_designability.py \
+  --designs-csv inference_outputs/weights/pdb/published/unconditional/designability_standard_top20_designs.csv \
+  --out-dir inference_outputs/weights/pdb/published/unconditional/figures/designability \
+  --runtime-root inference_outputs/weights/pdb/published/unconditional \
+  --min-plddt 70 \
+  --min-ptm 0.5 \
+  --max-ca-rmsd 2.0
+```
+
+宽松标准图：
+
+```bash
+python scripts/plot_designability.py \
+  --designs-csv inference_outputs/weights/pdb/published/unconditional/designability_relaxed_top20_designs.csv \
+  --out-dir inference_outputs/weights/pdb/published/unconditional/figures/relaxed_designability \
+  --runtime-root inference_outputs/weights/pdb/published/unconditional \
+  --min-plddt 55 \
+  --min-ptm 0.15 \
+  --max-ca-rmsd 10.0
+```
+
+本地生成图片位于：
+
+```text
+protein-frame-flow-main/inference_outputs/weights/pdb/published/unconditional/figures/designability
+protein-frame-flow-main/inference_outputs/weights/pdb/published/unconditional/figures/relaxed_designability
+```
+
+上传到 GitHub 时，建议将图片复制到：
+
+```text
+figures/designability
+figures/relaxed_designability
+```
+
+### 8. Designability figures
+
+#### Strict designability criteria
+
+<img src="./figures/designability/designability_sampler_overview.png" alt="Strict designability sampler overview" width="760">
+
+<img src="./figures/designability/designability_by_length.png" alt="Strict designability by backbone length" width="760">
+
+<img src="./figures/designability/plddt_vs_ca_rmsd.png" alt="Strict pLDDT vs CA-RMSD" width="640">
+
+<img src="./figures/designability/mpnn_score_vs_ca_rmsd.png" alt="Strict ProteinMPNN score vs CA-RMSD" width="640">
+
+<img src="./figures/designability/runtime_normalized_designability.png" alt="Strict runtime-normalized designability" width="760">
+
+#### Relaxed designability criteria
+
+<img src="./figures/relaxed_designability/designability_sampler_overview.png" alt="Relaxed designability sampler overview" width="760">
+
+<img src="./figures/relaxed_designability/designability_by_length.png" alt="Relaxed designability by backbone length" width="760">
+
+<img src="./figures/relaxed_designability/plddt_vs_ca_rmsd.png" alt="Relaxed pLDDT vs CA-RMSD" width="640">
+
+<img src="./figures/relaxed_designability/mpnn_score_vs_ca_rmsd.png" alt="Relaxed ProteinMPNN score vs CA-RMSD" width="640">
+
+<img src="./figures/relaxed_designability/runtime_normalized_designability.png" alt="Relaxed runtime-normalized designability" width="760">
+
 ## 后续计划
 
 下一阶段将继续基于当前 Euler baseline、Heun sampler 和 AB2 消融结果推进：

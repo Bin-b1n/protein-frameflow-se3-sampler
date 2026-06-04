@@ -1,39 +1,39 @@
 # Protein FrameFlow SE(3) Sampler Benchmark
 
-本项目基于 Microsoft FrameFlow / FoldFlow 的蛋白质骨架生成代码，研究在不重新训练模型权重的前提下，替换或增强 SE(3) flow 推理阶段采样器对短步数生成质量和可设计性的影响。
+This project is based on the Microsoft FrameFlow / FoldFlow protein backbone generation codebase. It studies whether inference-time SE(3) flow samplers can be replaced or improved without retraining model weights, with a focus on short-step generation quality and downstream designability.
 
-重点比较：
+The main comparisons are:
 
-- `Euler`：一阶 baseline。
-- `Heun / RK2`：二阶 predictor-corrector 采样器。
-- `Lie-AB2`：历史向量场复用的多步采样器。
-- 后处理验证：`ProteinMPNN` 序列设计 + `ESMFold2` 结构回折。
+- `Euler`: first-order baseline sampler.
+- `Heun / RK2`: second-order predictor-corrector sampler.
+- `Lie-AB2`: multistep sampler using historical vector-field reuse.
+- Post-processing validation: `ProteinMPNN` sequence design + `ESMFold2` structure refolding.
 
-> 本仓库不包含 FrameFlow 权重、训练数据集、ProteinMPNN 权重、ESMFold2 权重、Hugging Face 缓存或大规模生成的 PDB/CIF/FASTA 结果。
+> This repository does not include FrameFlow weights, training datasets, ProteinMPNN weights, ESMFold2 weights, Hugging Face caches, or large generated PDB/CIF/FASTA result files.
 
-## 目录
+## Contents
 
-- [环境配置](#环境配置)
-- [FrameFlow 骨架采样](#frameflow-骨架采样)
-- [几何质量评估](#几何质量评估)
-- [质量-效率 Benchmark](#质量-效率-benchmark)
-- [ProteinMPNN 与 ESMFold2 可设计性验证](#proteinmpnn-与-esmfold2-可设计性验证)
-- [结果展示](#结果展示)
-- [当前结论](#当前结论)
-- [未来改进方向](#未来改进方向)
-- [参考文献](#参考文献)
-- [许可](#许可)
+- [Environment](#environment)
+- [FrameFlow Backbone Sampling](#frameflow-backbone-sampling)
+- [Geometry Evaluation](#geometry-evaluation)
+- [Quality-Efficiency Benchmark](#quality-efficiency-benchmark)
+- [ProteinMPNN and ESMFold2 Designability Validation](#proteinmpnn-and-esmfold2-designability-validation)
+- [Results](#results)
+- [Current Conclusions](#current-conclusions)
+- [Future Work](#future-work)
+- [References](#references)
+- [License](#license)
 
-## 环境配置
+## Environment
 
-原始 FrameFlow 推荐环境为 Python 3.10 + CUDA 11.7。本项目推理实验使用 Python 3.12 / CUDA 12.4 / PyTorch 2.5.1，并提供适配依赖：
+The original FrameFlow repository recommends Python 3.10 + CUDA 11.7. This project uses Python 3.12 / CUDA 12.4 / PyTorch 2.5.1 for inference experiments and provides an adapted dependency file:
 
 ```bash
 cd protein-frame-flow-main
 pip install -r requirements-inference.txt
 ```
 
-关键依赖包括：
+Key dependencies include:
 
 ```text
 torch-scatter
@@ -47,29 +47,29 @@ tmtools
 matplotlib
 ```
 
-FrameFlow 权重需用户自行下载并放置到：
+FrameFlow weights must be downloaded separately and placed at:
 
 ```text
 weights/pdb/published.ckpt
 weights/pdb/config.yaml
 ```
 
-## FrameFlow 骨架采样
+## FrameFlow Backbone Sampling
 
-采样配置位于：
+The unconditional sampling configuration is:
 
 ```text
 configs/inference_unconditional.yaml
 ```
 
-采样器通过 Hydra 参数控制：
+The sampler is controlled through Hydra arguments:
 
 ```text
 inference.interpolant.sampling.method = euler | heun | ab2
 inference.interpolant.sampling.num_timesteps = 5 | 10 | 20 | 50 | 100
 ```
 
-示例：运行 5-step Euler。
+Example: run 5-step Euler.
 
 ```bash
 python -W ignore experiments/inference_se3_flows.py \
@@ -82,7 +82,7 @@ python -W ignore experiments/inference_se3_flows.py \
   inference.inference_subdir=euler_5_n20
 ```
 
-示例：运行 5-step Heun。
+Example: run 5-step Heun.
 
 ```bash
 python -W ignore experiments/inference_se3_flows.py \
@@ -95,7 +95,7 @@ python -W ignore experiments/inference_se3_flows.py \
   inference.inference_subdir=heun_5_n20
 ```
 
-输出结构：
+Example output layout:
 
 ```text
 inference_outputs/weights/pdb/published/unconditional/euler_5_n20/
@@ -104,11 +104,11 @@ inference_outputs/weights/pdb/published/unconditional/euler_5_n20/
   length_50/sample_0/x0_traj.pdb
 ```
 
-其中 `sample.pdb` 是最终生成骨架，后续几何评估、ProteinMPNN 序列设计和 ESMFold2 回折都基于该文件。
+`sample.pdb` is the final generated backbone. It is used for geometry evaluation, ProteinMPNN sequence design, and ESMFold2 refolding validation.
 
-## 几何质量评估
+## Geometry Evaluation
 
-批量计算所有 `sample.pdb` 的几何指标：
+Compute geometry metrics for all generated `sample.pdb` files:
 
 ```bash
 python analysis/evaluate_samples.py \
@@ -116,17 +116,17 @@ python analysis/evaluate_samples.py \
   --out inference_outputs/weights/pdb/published/unconditional/euler_5_n20/metrics.csv
 ```
 
-主要指标：
+Main metrics:
 
-- `ca_ca_deviation`：连续 CA-CA 距离相对理想值的平均偏差。
-- `ca_ca_valid_percent`：连续 CA-CA 距离落在合理范围内的比例。
-- `ca_ca_bad_percent`：异常 CA-CA 键长比例。
-- `radius_of_gyration`：回转半径。
-- `helix_percent / strand_percent / coil_percent`：二级结构比例。
+- `ca_ca_deviation`: mean deviation of consecutive CA-CA distances from the ideal value.
+- `ca_ca_valid_percent`: fraction of consecutive CA-CA distances within a reasonable range.
+- `ca_ca_bad_percent`: fraction of abnormal CA-CA bond lengths.
+- `radius_of_gyration`: radius of gyration.
+- `helix_percent / strand_percent / coil_percent`: secondary-structure composition.
 
-## 质量-效率 Benchmark
+## Quality-Efficiency Benchmark
 
-项目提供批量 benchmark 脚本：
+The project provides a batch benchmark script:
 
 ```bash
 SAMPLES_PER_LENGTH=20 \
@@ -135,7 +135,7 @@ LENGTH_SUBSET="[50,60,70,80,90,100]" \
 bash scripts/run_quality_efficiency_benchmark.sh
 ```
 
-默认比较：
+Default runs:
 
 ```text
 euler_5/10/20/50/100_n20
@@ -143,20 +143,20 @@ heun_5/10/20/50/100_n20
 ab2_5/10/20/50/100_n20
 ```
 
-每个配置：
+Each configuration contains:
 
 ```text
 6 lengths * 20 samples = 120 backbones
 ```
 
-每个输出目录包含：
+Each output directory contains:
 
 ```text
 metrics.csv
 runtime_seconds.txt
 ```
 
-汇总绘图：
+Generate summary plots:
 
 ```bash
 python analysis/plot_quality_efficiency.py \
@@ -166,29 +166,29 @@ python analysis/plot_quality_efficiency.py \
   --x runtime
 ```
 
-## ProteinMPNN 与 ESMFold2 可设计性验证
+## ProteinMPNN and ESMFold2 Designability Validation
 
-可设计性验证流程：
+Designability validation pipeline:
 
 ```text
 FrameFlow sample.pdb
-  -> ProteinMPNN 设计序列
-  -> 每个骨架取 top ProteinMPNN sequences
-  -> ESMFold2-Fast 全量初筛
-  -> 每个 sampler / length 选 top candidates
-  -> 标准 ESMFold2 复核
-  -> 计算 pLDDT / pTM / CA-RMSD / TM-score / designable rate
+  -> ProteinMPNN sequence design
+  -> select top ProteinMPNN sequences per backbone
+  -> ESMFold2-Fast full-batch screening
+  -> select top candidates per sampler / length
+  -> standard ESMFold2 review
+  -> compute pLDDT / pTM / CA-RMSD / TM-score / designable rate
 ```
 
-### 1. ProteinMPNN 序列设计
+### 1. ProteinMPNN Sequence Design
 
-ProteinMPNN 需单独准备：
+ProteinMPNN must be prepared separately:
 
 ```bash
 git clone https://github.com/dauparas/ProteinMPNN.git /root/autodl-tmp/protein-frame-flow-main/ProteinMPNN
 ```
 
-对 Euler 5-step 结果设计序列：
+Design sequences for the Euler 5-step backbones:
 
 ```bash
 python scripts/run_proteinmpnn_on_samples.py \
@@ -200,11 +200,11 @@ python scripts/run_proteinmpnn_on_samples.py \
   --batch-size 1
 ```
 
-Heun 5-step 同理，将 `euler_5_n20` 改为 `heun_5_n20`。
+For Heun 5-step, replace `euler_5_n20` with `heun_5_n20`.
 
-### 2. 汇总 top ProteinMPNN 序列
+### 2. Collect Top ProteinMPNN Sequences
 
-每个骨架取 ProteinMPNN score 最低的 top 3：
+Keep the top 3 sequences with the lowest ProteinMPNN score for each backbone:
 
 ```bash
 python scripts/collect_top_mpnn_sequences.py \
@@ -215,15 +215,15 @@ python scripts/collect_top_mpnn_sequences.py \
   --out-csv inference_outputs/weights/pdb/published/unconditional/designability_top3.csv
 ```
 
-规模：
+Scale:
 
 ```text
 2 samplers * 6 lengths * 20 backbones * 3 sequences = 720 sequences
 ```
 
-### 3. ESMFold2-Fast 初筛
+### 3. ESMFold2-Fast Screening
 
-ESMFold2-Fast 用于高通量初筛：
+ESMFold2-Fast is used for high-throughput screening:
 
 ```bash
 python scripts/run_esmfold2_batch.py \
@@ -237,9 +237,9 @@ python scripts/run_esmfold2_batch.py \
   --seed 0
 ```
 
-### 4. 标准 ESMFold2 复核
+### 4. Standard ESMFold2 Review
 
-每个 `sampler / length` 分组保留 top 20 候选：
+Keep the top 20 candidates for each `sampler / length` group:
 
 ```bash
 python scripts/select_esmfold2_candidates.py \
@@ -250,13 +250,13 @@ python scripts/select_esmfold2_candidates.py \
   --out-csv inference_outputs/weights/pdb/published/unconditional/standard_review_top20.csv
 ```
 
-标准版复核规模：
+Standard-review scale:
 
 ```text
 2 samplers * 6 lengths * 20 candidates = 240 sequences
 ```
 
-运行标准 ESMFold2：
+Run standard ESMFold2:
 
 ```bash
 python scripts/run_esmfold2_batch.py \
@@ -270,9 +270,9 @@ python scripts/run_esmfold2_batch.py \
   --seed 0
 ```
 
-### 5. 可设计性分析与绘图
+### 5. Designability Analysis and Plotting
 
-严格判定标准：
+Strict designability criteria:
 
 ```text
 pLDDT >= 70
@@ -291,7 +291,7 @@ python scripts/analyze_designability.py \
   --max-ca-rmsd 2.0
 ```
 
-宽松判定标准：
+Relaxed designability criteria:
 
 ```text
 pLDDT >= 55
@@ -310,7 +310,7 @@ python scripts/analyze_designability.py \
   --max-ca-rmsd 10.0
 ```
 
-绘制最终展示图表：
+Generate final display figures:
 
 ```bash
 python scripts/plot_designability.py \
@@ -322,9 +322,9 @@ python scripts/plot_designability.py \
   --max-ca-rmsd 10.0
 ```
 
-## 结果展示
+## Results
 
-### 质量-效率结果
+### Quality-Efficiency Results
 
 <img src="./figures/ca_ca_deviation_vs_runtime.png" alt="CA-CA deviation vs runtime" width="560">
 
@@ -334,7 +334,7 @@ python scripts/plot_designability.py \
 
 <img src="./figures/radius_of_gyration_vs_runtime.png" alt="Radius of gyration vs runtime" width="560">
 
-### 可设计性验证结果
+### Designability Validation Results
 
 <img src="./figures/relaxed_designability/designability_sampler_overview.png" alt="Relaxed designability sampler overview" width="560">
 
@@ -346,26 +346,26 @@ python scripts/plot_designability.py \
 
 <img src="./figures/relaxed_designability/runtime_normalized_designability.png" alt="Relaxed runtime-normalized designability" width="560">
 
-## 当前结论
+## Current Conclusions
 
-- 5-step 极低步数下，Heun/RK2 明显改善 Euler 的 CA-CA 几何退化。
-- Heun 需要更多网络调用，运行时间略高于 Euler，但低步数下可设计性显著更好。
-- Euler 在严格可设计性标准下通过率很低或为零；在 relaxed 标准下可保留少量候选，但整体仍弱于 Heun。
-- Lie-AB2 保持低网络调用次数，但 5-step 下简单历史外推不稳定，目前更适合作为多步历史复用方向的消融实验。
-- 当前推荐：若目标是极低步数下的骨架质量和可设计性，优先使用 endpoint-corrected Heun/RK2；若允许 10 步以上，Euler 仍是强 practical baseline。
+- At the extreme 5-step setting, Heun/RK2 significantly improves Euler's CA-CA geometry degradation.
+- Heun requires more network calls and slightly higher runtime than Euler, but gives much better short-step designability.
+- Euler has a very low or zero pass rate under strict designability criteria. Under relaxed criteria, it keeps a small number of candidates, but remains weaker than Heun overall.
+- Lie-AB2 keeps a low number of network calls, but simple historical extrapolation is unstable at 5 steps. It is currently more useful as an ablation for multistep historical reuse.
+- Current recommendation: use endpoint-corrected Heun/RK2 when the goal is very short-step backbone quality and designability. If 10 or more steps are allowed, Euler remains a strong practical baseline.
 
-## 未来改进方向
+## Future Work
 
-- 扩展测试长度和随机种子，减少当前 `6 lengths * 20 samples` 设置下的采样方差。
-- 对更多采样步数进行 ProteinMPNN + ESMFold2 验证，例如 `euler_10_n20` 与 `heun_10_n20`。
-- 引入更严格的结构验证指标，例如 all-atom clash、side-chain packing、Rosetta relax 后能量等。
-- 对 ESMFold2-Fast 与标准 ESMFold2 的筛选一致性进行系统分析。
-- 改进 Lie-AB2 的向量场 transport、时间参数化和几何 guard，使多步历史复用在 5-step 场景下更稳定。
-- 将可设计性指标归一化到 wall-clock runtime 和 network function evaluations，形成更完整的质量-效率-可设计性三维比较。
+- Expand test lengths and random seeds to reduce sampling variance under the current `6 lengths * 20 samples` setting.
+- Run ProteinMPNN + ESMFold2 validation for more sampling steps, such as `euler_10_n20` and `heun_10_n20`.
+- Add stricter structure validation metrics, such as all-atom clashes, side-chain packing, and Rosetta-relaxed energy.
+- Systematically compare screening consistency between ESMFold2-Fast and standard ESMFold2.
+- Improve Lie-AB2 vector-field transport, time parameterization, and geometry guards to stabilize multistep history reuse in the 5-step setting.
+- Normalize designability metrics by wall-clock runtime and network function evaluations to build a fuller quality-efficiency-designability comparison.
 
-## 参考文献
+## References
 
-如果使用本项目中的代码或实验流程，请同时引用相关原始方法：
+If you use this code or experimental workflow, please also cite the relevant original methods:
 
 ```bibtex
 @article{yim2024improved,
@@ -394,15 +394,15 @@ python scripts/plot_designability.py \
 }
 ```
 
-ESMFold2 / ESMC 请参考 Biohub 官方模型与代码说明：
+ESMFold2 / ESMC references:
 
 - Biohub ESM: https://github.com/Biohub/esm
 - ESMFold2 model page: https://biohub.ai/models/esmfold2
 
-## 许可
+## License
 
-本项目保留原 FrameFlow 仓库的 `LICENSE` 与 `NOTICE.md`。新增实验脚本和分析流程用于研究目的；ProteinMPNN、ESMFold2、FrameFlow 权重和相关模型文件分别遵循其原项目许可和使用条款。
+This project keeps the original FrameFlow `LICENSE` and `NOTICE.md`. The added experimental scripts and analysis workflow are intended for research use. ProteinMPNN, ESMFold2, FrameFlow weights, and related model files are governed by their respective upstream licenses and terms of use.
 
-## 致谢
+## Acknowledgements
 
-本项目基于 FrameFlow 官方代码与预训练权重进行推理端采样器实验。原始 FrameFlow 方法来自 SE(3) flow matching 在蛋白质骨架生成和 motif scaffolding 上的工作。
+This project is built on the official FrameFlow codebase and pretrained weights. The original FrameFlow method is based on SE(3) flow matching for protein backbone generation and motif scaffolding.

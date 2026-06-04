@@ -1,0 +1,98 @@
+# Python caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.pyre/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual environments
+.env
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE / editor files
+.vscode/
+.idea/
+*.code-workspace
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+MANIFEST
+
+# Jupyter / notebooks
+.ipynb_checkpoints/
+
+# Logs and experiment trackers
+*.log
+wandb/
+wandb*.json
+lightning_logs/
+**/lightning_logs/
+
+# Hydra / local run outputs
+.hydra/
+outputs/
+
+# FrameFlow weights and datasets
+weights/
+ckpt/
+processed_pdb/
+processed_scope/
+downloads/
+
+# Large generated inference outputs
+inference_outputs/
+**/inference_outputs/
+
+# ProteinMPNN external checkout and outputs
+ProteinMPNN/
+proteinmpnn/
+*.fa
+*.fasta
+
+# ESMFold2 / Hugging Face model caches
+hf_models/
+huggingface_cache/
+.cache/
+*.safetensors
+
+# Model checkpoints / tensors
+*.ckpt
+*.pt
+*.pth
+*.npz
+
+# Generated structure files
+*.pdb
+*.cif
+*.mmcif
+
+# Archives
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+
+# Local OS files
+Thumbs.db
+.DS_Store
+
+# Keep curated presentation figures tracked.
+!figures/
+!figures/**/*.png
+!figures/**/*.csv

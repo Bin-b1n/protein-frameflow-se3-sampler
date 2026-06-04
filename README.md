@@ -18,7 +18,6 @@ The main comparisons are:
 - [Geometry Evaluation](#geometry-evaluation)
 - [Quality-Efficiency Benchmark](#quality-efficiency-benchmark)
 - [ProteinMPNN and ESMFold2 Designability Validation](#proteinmpnn-and-esmfold2-designability-validation)
-- [Results](#results)
 - [Current Conclusions](#current-conclusions)
 - [Future Work](#future-work)
 - [References](#references)
@@ -165,6 +164,16 @@ python analysis/plot_quality_efficiency.py \
   --out-dir inference_outputs/weights/pdb/published/unconditional/quality_efficiency_n20 \
   --x runtime
 ```
+
+### Quality-Efficiency Results
+
+<img src="./figures/ca_ca_deviation_vs_runtime.png" alt="CA-CA deviation vs runtime" width="560">
+
+<img src="./figures/ca_ca_valid_percent_vs_runtime.png" alt="CA-CA valid percent vs runtime" width="560">
+
+<img src="./figures/ca_ca_bad_percent_vs_runtime.png" alt="CA-CA bad percent vs runtime" width="560">
+
+<img src="./figures/radius_of_gyration_vs_runtime.png" alt="Radius of gyration vs runtime" width="560">
 
 ## ProteinMPNN and ESMFold2 Designability Validation
 
@@ -321,18 +330,6 @@ python scripts/plot_designability.py \
   --min-ptm 0.15 \
   --max-ca-rmsd 10.0
 ```
-
-## Results
-
-### Quality-Efficiency Results
-
-<img src="./figures/ca_ca_deviation_vs_runtime.png" alt="CA-CA deviation vs runtime" width="560">
-
-<img src="./figures/ca_ca_valid_percent_vs_runtime.png" alt="CA-CA valid percent vs runtime" width="560">
-
-<img src="./figures/ca_ca_bad_percent_vs_runtime.png" alt="CA-CA bad percent vs runtime" width="560">
-
-<img src="./figures/radius_of_gyration_vs_runtime.png" alt="Radius of gyration vs runtime" width="560">
 
 ### Designability Validation Results
 

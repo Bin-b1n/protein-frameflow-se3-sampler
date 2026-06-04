@@ -20,6 +20,9 @@
 - [ProteinMPNN 与 ESMFold2 可设计性验证](#proteinmpnn-与-esmfold2-可设计性验证)
 - [结果展示](#结果展示)
 - [当前结论](#当前结论)
+- [未来改进方向](#未来改进方向)
+- [参考文献](#参考文献)
+- [许可](#许可)
 
 ## 环境配置
 
@@ -307,55 +310,41 @@ python scripts/analyze_designability.py \
   --max-ca-rmsd 10.0
 ```
 
-绘制图表：
+绘制最终展示图表：
 
 ```bash
 python scripts/plot_designability.py \
-  --designs-csv inference_outputs/weights/pdb/published/unconditional/designability_standard_top20_designs.csv \
-  --out-dir inference_outputs/weights/pdb/published/unconditional/figures/designability \
+  --designs-csv inference_outputs/weights/pdb/published/unconditional/designability_relaxed_top20_designs.csv \
+  --out-dir inference_outputs/weights/pdb/published/unconditional/figures/relaxed_designability \
   --runtime-root inference_outputs/weights/pdb/published/unconditional \
-  --min-plddt 70 \
-  --min-ptm 0.5 \
-  --max-ca-rmsd 2.0
+  --min-plddt 55 \
+  --min-ptm 0.15 \
+  --max-ca-rmsd 10.0
 ```
-
-宽松标准只需替换 `--designs-csv`、`--out-dir` 和阈值。
 
 ## 结果展示
 
 ### 质量-效率结果
 
-<img src="./figures/ca_ca_deviation_vs_runtime.png" alt="CA-CA deviation vs runtime" width="620">
+<img src="./figures/ca_ca_deviation_vs_runtime.png" alt="CA-CA deviation vs runtime" width="560">
 
-<img src="./figures/ca_ca_valid_percent_vs_runtime.png" alt="CA-CA valid percent vs runtime" width="620">
+<img src="./figures/ca_ca_valid_percent_vs_runtime.png" alt="CA-CA valid percent vs runtime" width="560">
 
-<img src="./figures/ca_ca_bad_percent_vs_runtime.png" alt="CA-CA bad percent vs runtime" width="620">
+<img src="./figures/ca_ca_bad_percent_vs_runtime.png" alt="CA-CA bad percent vs runtime" width="560">
 
-<img src="./figures/radius_of_gyration_vs_runtime.png" alt="Radius of gyration vs runtime" width="620">
+<img src="./figures/radius_of_gyration_vs_runtime.png" alt="Radius of gyration vs runtime" width="560">
 
-### 严格可设计性标准
+### 可设计性验证结果
 
-<img src="./figures/designability/designability_sampler_overview.png" alt="Strict designability sampler overview" width="760">
+<img src="./figures/relaxed_designability/designability_sampler_overview.png" alt="Relaxed designability sampler overview" width="560">
 
-<img src="./figures/designability/designability_by_length.png" alt="Strict designability by backbone length" width="760">
+<img src="./figures/relaxed_designability/designability_by_length.png" alt="Relaxed designability by backbone length" width="560">
 
-<img src="./figures/designability/plddt_vs_ca_rmsd.png" alt="Strict pLDDT vs CA-RMSD" width="640">
+<img src="./figures/relaxed_designability/plddt_vs_ca_rmsd.png" alt="Relaxed pLDDT vs CA-RMSD" width="560">
 
-<img src="./figures/designability/mpnn_score_vs_ca_rmsd.png" alt="Strict ProteinMPNN score vs CA-RMSD" width="640">
+<img src="./figures/relaxed_designability/mpnn_score_vs_ca_rmsd.png" alt="Relaxed ProteinMPNN score vs CA-RMSD" width="560">
 
-<img src="./figures/designability/runtime_normalized_designability.png" alt="Strict runtime-normalized designability" width="760">
-
-### 宽松可设计性标准
-
-<img src="./figures/relaxed_designability/designability_sampler_overview.png" alt="Relaxed designability sampler overview" width="760">
-
-<img src="./figures/relaxed_designability/designability_by_length.png" alt="Relaxed designability by backbone length" width="760">
-
-<img src="./figures/relaxed_designability/plddt_vs_ca_rmsd.png" alt="Relaxed pLDDT vs CA-RMSD" width="640">
-
-<img src="./figures/relaxed_designability/mpnn_score_vs_ca_rmsd.png" alt="Relaxed ProteinMPNN score vs CA-RMSD" width="640">
-
-<img src="./figures/relaxed_designability/runtime_normalized_designability.png" alt="Relaxed runtime-normalized designability" width="760">
+<img src="./figures/relaxed_designability/runtime_normalized_designability.png" alt="Relaxed runtime-normalized designability" width="560">
 
 ## 当前结论
 
@@ -365,37 +354,54 @@ python scripts/plot_designability.py \
 - Lie-AB2 保持低网络调用次数，但 5-step 下简单历史外推不稳定，目前更适合作为多步历史复用方向的消融实验。
 - 当前推荐：若目标是极低步数下的骨架质量和可设计性，优先使用 endpoint-corrected Heun/RK2；若允许 10 步以上，Euler 仍是强 practical baseline。
 
-## 文件上传建议
+## 未来改进方向
 
-建议提交到 GitHub：
+- 扩展测试长度和随机种子，减少当前 `6 lengths * 20 samples` 设置下的采样方差。
+- 对更多采样步数进行 ProteinMPNN + ESMFold2 验证，例如 `euler_10_n20` 与 `heun_10_n20`。
+- 引入更严格的结构验证指标，例如 all-atom clash、side-chain packing、Rosetta relax 后能量等。
+- 对 ESMFold2-Fast 与标准 ESMFold2 的筛选一致性进行系统分析。
+- 改进 Lie-AB2 的向量场 transport、时间参数化和几何 guard，使多步历史复用在 5-step 场景下更稳定。
+- 将可设计性指标归一化到 wall-clock runtime 和 network function evaluations，形成更完整的质量-效率-可设计性三维比较。
 
-```text
-README.md
-scripts/run_proteinmpnn_on_samples.py
-scripts/collect_top_mpnn_sequences.py
-scripts/run_esmfold2_batch.py
-scripts/select_esmfold2_candidates.py
-scripts/analyze_designability.py
-scripts/plot_designability.py
-figures/
+## 参考文献
+
+如果使用本项目中的代码或实验流程，请同时引用相关原始方法：
+
+```bibtex
+@article{yim2024improved,
+  title={Improved motif-scaffolding with SE(3) flow matching},
+  author={Yim, Jason and Campbell, Andrew and Mathieu, Emile and Foong, Andrew Y. K. and Gastegger, Michael and Jimenez-Luna, Jose and Lewis, Sarah and Garcia Satorras, Victor and Veeling, Bastiaan S. and Noe, Frank and Barzilay, Regina and Jaakkola, Tommi},
+  journal={Transactions on Machine Learning Research},
+  year={2024},
+  url={https://openreview.net/forum?id=fa1ne8xDGn}
+}
+
+@article{yim2023fast,
+  title={Fast protein backbone generation with SE(3) flow matching},
+  author={Yim, Jason and Campbell, Andrew and Foong, Andrew Y. K. and Gastegger, Michael and Jimenez-Luna, Jose and Lewis, Sarah and Garcia Satorras, Victor and Veeling, Bastiaan S. and Barzilay, Regina and Jaakkola, Tommi},
+  journal={arXiv preprint arXiv:2310.05297},
+  year={2023}
+}
+
+@article{dauparas2022robust,
+  title={Robust deep learning-based protein sequence design using ProteinMPNN},
+  author={Dauparas, Justas and Anishchenko, Ivan and Bennett, Nathaniel and Bai, Hua and Ragotte, Robert J. and Milles, Lukas F. and Wicky, Basile I. M. and Courbet, Alexis and de Haas, Rob J. and Bethel, Neville and Leung, Philip J. Y. and Huddy, Thomas F. and Pellock, Samuel and Tischer, Doug and Chan, Frederick and Koepnick, Brian and Nguyen, Hanne and Kang, Alex and Sankaran, Banumathi and Bera, Asim K. and King, Neil P. and Baker, David},
+  journal={Science},
+  volume={378},
+  number={6615},
+  pages={49--56},
+  year={2022}
+}
 ```
 
-不建议提交：
+ESMFold2 / ESMC 请参考 Biohub 官方模型与代码说明：
 
-```text
-ProteinMPNN/
-hf_models/
-huggingface_cache/
-weights/
-processed_pdb/
-processed_scope/
-inference_outputs/
-*.pdb
-*.cif
-*.mmcif
-*.safetensors
-*.ckpt
-```
+- Biohub ESM: https://github.com/Biohub/esm
+- ESMFold2 model page: https://biohub.ai/models/esmfold2
+
+## 许可
+
+本项目保留原 FrameFlow 仓库的 `LICENSE` 与 `NOTICE.md`。新增实验脚本和分析流程用于研究目的；ProteinMPNN、ESMFold2、FrameFlow 权重和相关模型文件分别遵循其原项目许可和使用条款。
 
 ## 致谢
 

@@ -49,14 +49,17 @@ def _sampler_color(sampler: str) -> str:
     return PALETTE.get(_sampler_method(sampler), "#6C757D")
 
 
-def _prepare_df(path: Path, min_plddt: float, min_ptm: float, max_ca_rmsd: float) -> pd.DataFrame:
+def _prepare_df(path: Path, min_plddt: float, min_ptm: float, max_sc_rmsd: float) -> pd.DataFrame:
     df = pd.read_csv(path)
+    if "sc_rmsd" not in df.columns and "ca_rmsd" in df.columns:
+        df["sc_rmsd"] = df["ca_rmsd"]
     numeric_cols = [
         "length",
         "mpnn_score",
         "standard_plddt",
         "standard_ptm",
         "standard_iptm",
+        "sc_rmsd",
         "ca_rmsd",
         "tm_norm_folded",
         "tm_norm_backbone",
@@ -71,7 +74,7 @@ def _prepare_df(path: Path, min_plddt: float, min_ptm: float, max_ca_rmsd: float
     df["designable"] = (
         (df["standard_plddt"] >= min_plddt)
         & (df["standard_ptm"] >= min_ptm)
-        & (df["ca_rmsd"] <= max_ca_rmsd)
+        & (df["sc_rmsd"] <= max_sc_rmsd)
     ).astype(int)
     df["sampler_label"] = df["sampler"].map(_sampler_label)
     df["sampler_color"] = df["sampler"].map(_sampler_color)
@@ -128,7 +131,7 @@ def plot_overview(df: pd.DataFrame, out_dir: Path, show_error_bars: bool) -> Pat
     metrics = [
         ("standard_plddt", "Mean pLDDT", "pLDDT", "{:.1f}"),
         ("standard_ptm", "Mean pTM", "pTM", "{:.2f}"),
-        ("ca_rmsd", "Mean CA-RMSD", "Angstrom", "{:.2f}"),
+        ("sc_rmsd", "Mean scRMSD", "Angstrom", "{:.2f}"),
         ("designable", "Designable Rate", "Fraction", "{:.2f}"),
     ]
     samplers = sorted(df["sampler"].unique())
@@ -166,7 +169,7 @@ def plot_by_length(df: pd.DataFrame, out_dir: Path) -> Path:
     metrics = [
         ("standard_plddt", "pLDDT", "pLDDT"),
         ("standard_ptm", "pTM", "pTM"),
-        ("ca_rmsd", "CA-RMSD", "Angstrom"),
+        ("sc_rmsd", "scRMSD", "Angstrom"),
         ("designable", "Designable Rate", "Fraction"),
     ]
     samplers = sorted(df["sampler"].unique())
@@ -211,13 +214,13 @@ def plot_confidence_vs_rmsd(
     df: pd.DataFrame,
     out_dir: Path,
     min_plddt: float,
-    max_ca_rmsd: float,
+    max_sc_rmsd: float,
 ) -> Path:
     fig, ax = plt.subplots(figsize=(7.8, 5.6), dpi=180)
     for sampler, group in df.groupby("sampler"):
         designable = group["designable"].fillna(0).astype(int) == 1
         ax.scatter(
-            group.loc[~designable, "ca_rmsd"],
+            group.loc[~designable, "sc_rmsd"],
             group.loc[~designable, "standard_plddt"],
             s=42,
             color=_sampler_color(sampler),
@@ -227,7 +230,7 @@ def plot_confidence_vs_rmsd(
             linewidths=0,
         )
         ax.scatter(
-            group.loc[designable, "ca_rmsd"],
+            group.loc[designable, "sc_rmsd"],
             group.loc[designable, "standard_plddt"],
             s=58,
             color=_sampler_color(sampler),
@@ -238,16 +241,16 @@ def plot_confidence_vs_rmsd(
             linewidths=0.55,
         )
     ax.axhline(min_plddt, color="#495057", linestyle="--", linewidth=1.2)
-    ax.axvline(max_ca_rmsd, color="#495057", linestyle="--", linewidth=1.2)
-    ax.text(max_ca_rmsd, ax.get_ylim()[1], f"  RMSD <= {max_ca_rmsd:g}", va="top", fontsize=8)
+    ax.axvline(max_sc_rmsd, color="#495057", linestyle="--", linewidth=1.2)
+    ax.text(max_sc_rmsd, ax.get_ylim()[1], f"  scRMSD <= {max_sc_rmsd:g}", va="top", fontsize=8)
     ax.text(ax.get_xlim()[1], min_plddt, f"pLDDT >= {min_plddt:g}  ", ha="right", va="bottom", fontsize=8)
-    ax.set_xlabel("Folded vs generated backbone CA-RMSD (Angstrom)")
+    ax.set_xlabel("Self-consistency RMSD, folded vs generated backbone (Angstrom)")
     ax.set_ylabel("Standard ESMFold2 pLDDT")
     ax.set_title("Confidence vs Backbone Recovery", fontsize=13, weight="bold")
     ax.grid(True, alpha=0.25)
     ax.legend(frameon=False, fontsize=8, ncol=2)
     fig.tight_layout()
-    out_path = out_dir / "plddt_vs_ca_rmsd.png"
+    out_path = out_dir / "plddt_vs_sc_rmsd.png"
     fig.savefig(out_path)
     plt.close(fig)
     return out_path
@@ -258,19 +261,19 @@ def plot_mpnn_vs_recovery(df: pd.DataFrame, out_dir: Path) -> Path:
     for sampler, group in df.groupby("sampler"):
         ax.scatter(
             group["mpnn_score"],
-            group["ca_rmsd"],
+            group["sc_rmsd"],
             s=48,
             color=_sampler_color(sampler),
             alpha=0.75,
             label=_sampler_label(sampler),
         )
     ax.set_xlabel("ProteinMPNN score (lower is better)")
-    ax.set_ylabel("Folded vs generated backbone CA-RMSD (Angstrom)")
+    ax.set_ylabel("Self-consistency RMSD (Angstrom)")
     ax.set_title("Sequence Score vs Backbone Recovery", fontsize=13, weight="bold")
     ax.grid(True, alpha=0.25)
     ax.legend(frameon=False)
     fig.tight_layout()
-    out_path = out_dir / "mpnn_score_vs_ca_rmsd.png"
+    out_path = out_dir / "mpnn_score_vs_sc_rmsd.png"
     fig.savefig(out_path)
     plt.close(fig)
     return out_path
@@ -285,7 +288,7 @@ def write_plot_summary(df: pd.DataFrame, out_dir: Path, runtime_root: Path | Non
             mpnn_score_mean=("mpnn_score", "mean"),
             standard_plddt_mean=("standard_plddt", "mean"),
             standard_ptm_mean=("standard_ptm", "mean"),
-            ca_rmsd_mean=("ca_rmsd", "mean"),
+            sc_rmsd_mean=("sc_rmsd", "mean"),
             tm_norm_backbone_mean=("tm_norm_backbone", "mean"),
             designable_rate=("designable", "mean"),
         )
@@ -359,7 +362,14 @@ def main() -> int:
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--min-plddt", type=float, default=70.0)
     parser.add_argument("--min-ptm", type=float, default=0.5)
-    parser.add_argument("--max-ca-rmsd", type=float, default=2.0)
+    parser.add_argument(
+        "--max-sc-rmsd",
+        "--max-ca-rmsd",
+        dest="max_sc_rmsd",
+        type=float,
+        default=2.0,
+        help="Maximum self-consistency RMSD threshold. --max-ca-rmsd is kept as a compatibility alias.",
+    )
     parser.add_argument(
         "--runtime-root",
         default=None,
@@ -379,14 +389,14 @@ def main() -> int:
         Path(args.designs_csv).expanduser().resolve(),
         args.min_plddt,
         args.min_ptm,
-        args.max_ca_rmsd,
+        args.max_sc_rmsd,
     )
 
     paths = [
         write_plot_summary(df, out_dir, runtime_root),
         plot_overview(df, out_dir, show_error_bars=not args.no_error_bars),
         plot_by_length(df, out_dir),
-        plot_confidence_vs_rmsd(df, out_dir, args.min_plddt, args.max_ca_rmsd),
+        plot_confidence_vs_rmsd(df, out_dir, args.min_plddt, args.max_sc_rmsd),
         plot_mpnn_vs_recovery(df, out_dir),
         plot_runtime_normalized(df, out_dir, runtime_root),
     ]

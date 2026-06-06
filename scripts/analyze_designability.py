@@ -1,7 +1,8 @@
 """Analyze designability from ProteinMPNN and ESMFold2 review results.
 
 The script joins selected ProteinMPNN candidates with standard ESMFold2 results,
-computes folded-vs-generated-backbone CA-RMSD and optional TM-score, then writes
+computes self-consistency RMSD (scRMSD) between the folded structure and the
+generated backbone, then writes
 per-design and grouped summary CSVs.
 
 Example:
@@ -109,6 +110,7 @@ def _summarize_group(group_name: str, group_value: str, rows: list[dict[str, str
         "mpnn_score",
         "standard_plddt",
         "standard_ptm",
+        "sc_rmsd",
         "ca_rmsd",
         "tm_norm_folded",
         "tm_norm_backbone",
@@ -148,11 +150,18 @@ def main() -> int:
     parser.add_argument("--out-summary", required=True)
     parser.add_argument("--min-plddt", type=float, default=70.0)
     parser.add_argument("--min-ptm", type=float, default=0.5)
-    parser.add_argument("--max-ca-rmsd", type=float, default=2.0)
+    parser.add_argument(
+        "--max-sc-rmsd",
+        "--max-ca-rmsd",
+        dest="max_sc_rmsd",
+        type=float,
+        default=2.0,
+        help="Maximum self-consistency RMSD threshold. --max-ca-rmsd is kept as a compatibility alias.",
+    )
     parser.add_argument(
         "--skip-tm-score",
         action="store_true",
-        help="Skip tmtools TM-score calculation and only report CA-RMSD.",
+        help="Skip tmtools TM-score calculation and only report scRMSD.",
     )
     args = parser.parse_args()
 
@@ -179,7 +188,7 @@ def main() -> int:
         length = min(len(backbone_ca), len(folded_ca))
         if length < 3:
             raise ValueError(f"Too few matched CA atoms for {design_id}")
-        ca_rmsd = _kabsch_rmsd(backbone_ca[:length], folded_ca[:length])
+        sc_rmsd = _kabsch_rmsd(backbone_ca[:length], folded_ca[:length])
 
         if args.skip_tm_score:
             tm_folded = tm_backbone = math.nan
@@ -197,7 +206,7 @@ def main() -> int:
             and not math.isnan(ptm)
             and plddt >= args.min_plddt
             and ptm >= args.min_ptm
-            and ca_rmsd <= args.max_ca_rmsd
+            and sc_rmsd <= args.max_sc_rmsd
         )
 
         design_rows.append(
@@ -212,7 +221,9 @@ def main() -> int:
                 "standard_plddt": _format(plddt),
                 "standard_ptm": fold_row.get("ptm", ""),
                 "standard_iptm": fold_row.get("iptm", ""),
-                "ca_rmsd": _format(ca_rmsd),
+                "sc_rmsd": _format(sc_rmsd),
+                # Kept for backward compatibility with earlier local notebooks.
+                "ca_rmsd": _format(sc_rmsd),
                 "tm_norm_folded": _format(tm_folded),
                 "tm_norm_backbone": _format(tm_backbone),
                 "designable": "1" if designable else "0",

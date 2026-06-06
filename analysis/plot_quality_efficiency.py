@@ -131,9 +131,6 @@ def main():
         "--metrics",
         nargs="+",
         default=[
-            "ca_ca_deviation",
-            "ca_ca_bad_percent",
-            "ca_ca_valid_percent",
             "radius_of_gyration",
             "helix_percent",
             "coil_percent",

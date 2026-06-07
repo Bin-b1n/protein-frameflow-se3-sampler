@@ -368,7 +368,6 @@ sampler = heun_5_n20
 length = 60
 pLDDT = 80.0573
 pTM = 0.714088
-iPTM = 0.000000
 scRMSD = 1.126196 Angstrom
 ```
 
@@ -381,7 +380,6 @@ sampler = euler_5_n20
 length = 70
 pLDDT = 60.7859
 pTM = 0.262243
-iPTM = 0.000000
 scRMSD = 9.176732 Angstrom
 ```
 
